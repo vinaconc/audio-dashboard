@@ -269,7 +269,7 @@ def job_events(job_id: int, after_id: int = 0, limit: int = 200,
                db: Session = Depends(get_db)):
     """Devuelve los eventos de un job. Con after_id solo los nuevos."""
     rows = db.execute(text("""
-        SELECT id, ts, level, stage, message, data
+        SELECT id, created_at, level, stage, message, data
         FROM job_events
         WHERE job_id = :j AND id > :after
         ORDER BY id ASC
