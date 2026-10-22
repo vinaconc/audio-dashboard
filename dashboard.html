@@ -1,0 +1,1647 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chord Analyzer — Jobs</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #0f172a; color: #e2e8f0;
+    padding: 16px; max-width: 1400px; margin: 0 auto;
+  }
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px; flex-wrap: wrap; gap: 8px;
+  }
+  h1 { font-size: 20px; }
+  h2 { font-size: 15px; color: #cbd5e1; margin-bottom: 8px; }
+
+  .kpis {
+    display: grid; grid-template-columns: repeat(2, 1fr);
+    gap: 12px; margin-bottom: 16px;
+  }
+  @media (min-width: 768px) { .kpis { grid-template-columns: repeat(5, 1fr); } }
+  .kpi {
+    background: #1e293b; border-radius: 8px; padding: 14px 16px;
+    border: 1px solid #334155;
+  }
+  .kpi .label {
+    font-size: 11px; color: #94a3b8;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .kpi .value { font-size: 24px; font-weight: 700; margin-top: 6px; }
+  .kpi .value.pending    { color: #fbbf24; }
+  .kpi .value.processing { color: #60a5fa; }
+  .kpi .value.completed  { color: #4ade80; }
+  .kpi .value.error      { color: #f87171; }
+
+  .controls {
+    display: flex; gap: 8px; margin-bottom: 16px;
+    flex-wrap: wrap; align-items: center;
+  }
+  .controls button {
+    background: #1e293b; color: #cbd5e1; border: 1px solid #334155;
+    padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px;
+  }
+  .controls button:hover { background: #334155; }
+  .controls button.active {
+    background: #3b82f6; color: white; border-color: #3b82f6;
+  }
+  .controls input {
+    background: #1e293b; color: #e2e8f0; border: 1px solid #334155;
+    padding: 6px 12px; border-radius: 6px; font-size: 13px;
+    flex: 1; min-width: 200px; max-width: 320px;
+  }
+
+  .layout {
+    display: grid; grid-template-columns: 1fr; gap: 16px;
+  }
+  @media (min-width: 1024px) {
+    .layout { grid-template-columns: 1fr 480px; }
+  }
+
+  table {
+    width: 100%; border-collapse: collapse; background: #1e293b;
+    border-radius: 8px; overflow: hidden; border: 1px solid #334155;
+  }
+  th, td {
+    text-align: left; padding: 10px 12px;
+    border-bottom: 1px solid #334155; font-size: 13px;
+  }
+  th {
+    color: #94a3b8; font-weight: 500; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    background: #0f172a;
+  }
+  tr:last-child td { border-bottom: none; }
+  tbody tr { cursor: pointer; transition: background 0.1s; }
+  tbody tr:hover { background: #243044; }
+  tbody tr.selected { background: #1e3a8a; }
+
+  .badge {
+    display: inline-block; padding: 3px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+  }
+  .badge.pending    { background: #78350f; color: #fcd34d; }
+  .badge.processing { background: #1e3a8a; color: #93c5fd; }
+  .badge.completed  { background: #14532d; color: #86efac; }
+  .badge.error      { background: #7f1d1d; color: #fca5a5; }
+
+  .detail {
+    background: #1e293b; border-radius: 8px; padding: 16px;
+    border: 1px solid #334155; position: sticky; top: 16px;
+    max-height: calc(100vh - 32px); overflow-y: auto;
+  }
+  .detail-empty { color: #64748b; text-align: center; padding: 40px 0; }
+  .detail h2 { font-size: 16px; margin-bottom: 4px; }
+  .detail .meta { font-size: 12px; color: #94a3b8; margin-bottom: 12px; }
+  .detail .actions {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;
+  }
+  .detail .actions button {
+    padding: 8px 14px; border-radius: 6px; border: none;
+    cursor: pointer; font-size: 13px; font-weight: 500;
+  }
+  .btn-requeue { background: #3b82f6; color: white; }
+  .btn-requeue:hover { background: #2563eb; }
+  .btn-requeue:disabled { background: #475569; cursor: not-allowed; }
+  .btn-copy { background: #334155; color: #e2e8f0; }
+  .btn-copy:hover { background: #475569; }
+
+  .field { margin-bottom: 12px; }
+  .field-label {
+    font-size: 11px; color: #94a3b8;
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;
+  }
+  .field-value {
+    font-size: 13px; color: #e2e8f0; word-break: break-word;
+  }
+  .field-value.mono {
+    font-family: ui-monospace, monospace; font-size: 12px;
+    background: #0f172a; padding: 8px; border-radius: 4px;
+    max-height: 300px; overflow: auto; white-space: pre-wrap;
+  }
+  .field-value.error-text { color: #fca5a5; }
+
+  .empty { text-align: center; color: #64748b; padding: 24px; }
+/* ---------- Eventos del pipeline ---------- */
+.events-section {
+  margin-top: 24px;
+  border-top: 1px solid #334155;
+  padding-top: 16px;
+}
+.events-section h3 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.events-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.event-row {
+  display: grid;
+  grid-template-columns: 60px 24px 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 6px 0;
+  border-bottom: 1px solid #1e293b;
+  font-size: 13px;
+}
+.event-row:last-child { border-bottom: none; }
+.event-row .time {
+  color: #64748b;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  padding-top: 2px;
+}
+.event-row .icon {
+  font-size: 14px;
+  text-align: center;
+  padding-top: 1px;
+}
+.event-row .body { min-width: 0; }
+.event-row .msg {
+  color: #e2e8f0;
+  word-break: break-word;
+}
+.event-row.level-error .msg { color: #fca5a5; }
+.event-row.level-success .msg { color: #86efac; }
+.event-row .event-data {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: #0f172a;
+  border-radius: 4px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: #cbd5e1;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.event-row .chord-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+.chord-pill {
+  background: #1e3a8a;
+  color: #93c5fd;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+}
+.events-status {
+  font-size: 11px;
+  color: #64748b;
+  text-align: right;
+  margin-bottom: 4px;
+  min-height: 16px;
+}
+.events-status.live {
+  color: #4ade80;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.events-status.live::after {
+  content: ' ⟳';
+  display: inline-block;
+  animation: spin 1s linear infinite;
+  margin-left: 4px;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.user-meta {
+  font-size: 11px; color: #64748b;
+  font-family: ui-monospace, monospace;
+  margin-bottom: 10px;
+}
+.user-verses {
+  display: flex; flex-direction: column; gap: 2px;
+  background: #0f172a; border: 1px solid #334155;
+  border-radius: 6px; padding: 10px 12px;
+}
+.user-verse {
+  display: grid; grid-template-columns: 28px 1fr; gap: 10px;
+  align-items: baseline; padding: 4px 0;
+  border-bottom: 1px solid #1e293b;
+}
+.user-verse:last-child { border-bottom: none; }
+.user-verse-num {
+  font-size: 11px; color: #475569;
+  font-family: ui-monospace, monospace;
+  user-select: none;
+}
+.user-verse-text {
+  font-size: 13px; color: #e2e8f0; line-height: 1.5;
+  white-space: pre-wrap; word-break: break-word;
+}
+
+/* Parts colapsables */
+.user-parts-details {
+  margin-top: 12px;
+  background: #0f172a; border: 1px solid #334155;
+  border-radius: 6px; padding: 8px 12px;
+}
+.user-parts-details summary {
+  cursor: pointer; font-size: 12px; color: #94a3b8;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  user-select: none;
+}
+.user-parts-details summary:hover { color: #cbd5e1; }
+.user-parts {
+  margin-top: 10px; display: flex; flex-direction: column; gap: 6px;
+}
+.part-row {
+  padding: 6px 8px; background: #1e293b;
+  border-radius: 4px; border-left: 2px solid #3b82f6;
+}
+.part-head {
+  display: flex; gap: 10px; align-items: center;
+  font-size: 11px; font-family: ui-monospace, monospace;
+  color: #64748b; margin-bottom: 3px;
+}
+.part-label {
+  background: #3b82f6; color: white;
+  padding: 1px 6px; border-radius: 3px; font-weight: 700;
+}
+.part-placement { color: #64748b; }
+
+/* Cortes de versos: un tramo por corte con su rango de tiempo */
+.cut-list {
+  display: flex; flex-direction: column; gap: 6px;
+  background: #0f172a; border: 1px solid #334155;
+  border-radius: 6px; padding: 10px 12px;
+}
+.cut-row {
+  display: grid; grid-template-columns: 28px 1fr; gap: 10px;
+  align-items: start; padding: 6px 8px; background: #1e293b;
+  border-radius: 4px; border-left: 2px solid #3b82f6;
+}
+.cut-num {
+  font-size: 11px; color: #475569;
+  font-family: ui-monospace, monospace; user-select: none;
+  padding-top: 2px;
+}
+.cut-times {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  font-size: 11px; font-family: ui-monospace, monospace;
+  color: #94a3b8; margin-bottom: 3px;
+}
+.cut-time { color: #60a5fa; font-weight: 600; }
+.cut-arrow { color: #475569; }
+.cut-dur { color: #64748b; }
+
+.part-lyrics {
+  font-size: 13px; color: #e2e8f0; line-height: 1.5;
+  white-space: pre-wrap; word-break: break-word;
+}
+.part-lyrics u {
+  text-decoration-color: #60a5fa;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+  #updated { font-size: 12px; color: #64748b; }
+/* Indicador de workers */
+.worker-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0 18px;
+}
+.worker-card {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border: 1px solid var(--border, #444);
+  border-radius: 10px;
+  background: var(--card, rgba(128,128,128,.08));
+}
+.worker-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #888;
+  flex: 0 0 auto;
+}
+.worker-dot.active { background: #22c55e; }
+.worker-dot.inactive { background: #ef4444; }
+.worker-name { font-weight: 600; }
+.worker-detail { font-size: 12px; opacity: .75; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎵 Chord Analyzer — Jobs</h1>
+  <span id="updated">Cargando...</span>
+</header>
+
+<div class="kpis" id="kpis"></div>
+<div class="worker-panel" id="workerStatus" aria-live="polite">
+  <div class="worker-card">
+    <span class="worker-dot"></span>
+    <div><div class="worker-name">Local</div><div class="worker-detail">Consultando...</div></div>
+  </div>
+  <div class="worker-card">
+    <span class="worker-dot"></span>
+    <div><div class="worker-name">Kaggle</div><div class="worker-detail">Consultando...</div></div>
+  </div>
+</div>
+
+<div class="controls">
+  <button data-status="" class="active">Todos</button>
+  <button data-status="pending">Pending</button>
+  <button data-status="processing">Processing</button>
+  <button data-status="completed">Completed</button>
+  <button data-status="error">Error</button>
+  <input id="search" type="text" placeholder="Buscar por ID o título...">
+  <button id="refresh-btn" style="margin-left:auto;">⟳ Refrescar</button>
+</div>
+
+<div class="layout">
+  <div>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Título</th>
+          <th>Status</th>
+          <th>Inicio</th>
+          <th>Duración</th>
+        </tr>
+      </thead>
+      <tbody id="jobs"></tbody>
+    </table>
+  </div>
+
+  <div class="detail" id="detail">
+    <div class="detail-empty">Selecciona un job para ver el detalle</div>
+  </div>
+</div>
+
+<!-- ============================================================
+     ADMIN — Crear tabla
+     ============================================================ -->
+<div class="admin-panel">
+  <h3>⚙️ Crear tabla</h3>
+
+  <div class="form-row">
+    <label for="tbl-name">Nombre de la tabla</label>
+    <input id="tbl-name" type="text" placeholder="ej: job_events" autocomplete="off">
+  </div>
+
+  <div class="form-row">
+    <label>Columnas</label>
+    <table class="cols-table">
+      <thead>
+        <tr>
+          <th style="width:20%">Nombre</th>
+          <th style="width:25%">Tipo</th>
+          <th style="width:10%">Nullable</th>
+          <th style="width:8%">PK</th>
+          <th style="width:25%">Default</th>
+          <th style="width:5%"></th>
+        </tr>
+      </thead>
+      <tbody id="cols-body"></tbody>
+    </table>
+    <button id="btn-add-col" type="button">+ Agregar columna</button>
+  </div>
+
+  <div class="form-row">
+    <label>Vista previa del SQL</label>
+    <pre id="ddl-preview" class="ddl-preview">(agrega al menos una columna)</pre>
+  </div>
+
+  <div class="form-row">
+    <button id="btn-create-table" type="button">✓ Crear tabla</button>
+    <span id="create-status" class="status-msg"></span>
+  </div>
+
+  <div class="form-row">
+    <label>Tablas existentes</label>
+    <div id="tables-list" class="tables-list">Cargando...</div>
+  </div>
+</div>
+
+<!-- ============================================================
+     ADMIN — Consulta SQL
+     ============================================================ -->
+<div class="admin-panel">
+  <h3>🔎 Consulta SQL</h3>
+
+  <div class="form-row">
+    <label for="sql-query">Consulta</label>
+
+    <textarea
+      id="sql-query"
+      rows="6"
+      style="
+        width:100%;
+        background:#0f172a;
+        color:#e2e8f0;
+        border:1px solid #334155;
+        padding:10px;
+        border-radius:6px;
+        font-family:ui-monospace, monospace;
+        font-size:12px;
+        resize:vertical;
+      "
+      placeholder="SELECT * FROM job_events ORDER BY id DESC LIMIT 20;
+
+UPDATE jobs
+SET error = NULL
+WHERE id = 131;"
+    ></textarea>
+  </div>
+
+  <div class="form-row">
+    <button id="btn-execute-sql" type="button">
+      ▶ Ejecutar consulta
+    </button>
+
+    <span id="sql-status" class="status-msg"></span>
+  </div>
+
+  <div class="form-row">
+    <label>Resultado</label>
+
+    <div id="sql-result"></div>
+  </div>
+</div>
+
+<style>
+.admin-panel {
+  margin: 24px auto; padding: 20px;
+  background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+  max-width: 1400px;
+}
+.admin-panel h3 { margin: 0 0 16px; font-size: 15px; color: #cbd5e1; }
+.form-row { margin-bottom: 16px; }
+.form-row label {
+  display: block; font-size: 11px; color: #94a3b8;
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;
+}
+.form-row input[type=text] {
+  background: #0f172a; color: #e2e8f0; border: 1px solid #334155;
+  padding: 8px 12px; border-radius: 6px; font-size: 13px;
+  width: 100%; max-width: 320px;
+}
+.cols-table {
+  width: 100%; border-collapse: collapse; background: #0f172a;
+  border: 1px solid #334155; border-radius: 6px; overflow: hidden;
+}
+.cols-table th, .cols-table td {
+  padding: 8px 10px; font-size: 12px;
+  border-bottom: 1px solid #334155; text-align: left;
+}
+.cols-table th {
+  color: #94a3b8; font-weight: 500; text-transform: uppercase;
+  font-size: 10px; letter-spacing: 0.5px; background: #1e293b;
+}
+.cols-table input[type=text], .cols-table select {
+  background: #1e293b; color: #e2e8f0;
+  border: 1px solid #334155; padding: 5px 8px;
+  border-radius: 4px; font-size: 12px; width: 100%;
+}
+.cols-table input[type=checkbox] { cursor: pointer; }
+.cols-table button.del {
+  background: transparent; color: #f87171; border: none;
+  cursor: pointer; font-size: 14px; padding: 4px 8px;
+}
+.cols-table button.del:hover { background: #7f1d1d; border-radius: 4px; }
+#btn-add-col, #btn-create-table {
+  background: #3b82f6; color: white; border: none;
+  padding: 8px 14px; border-radius: 6px; cursor: pointer;
+  font-size: 13px; font-weight: 500; margin-top: 8px;
+}
+#btn-add-col { background: #475569; }
+#btn-add-col:hover { background: #64748b; }
+#btn-create-table:hover { background: #2563eb; }
+#btn-create-table:disabled { background: #475569; cursor: not-allowed; }
+.ddl-preview {
+  background: #020617; padding: 12px; border-radius: 6px;
+  font-family: ui-monospace, monospace; font-size: 12px;
+  color: #cbd5e1; white-space: pre-wrap; margin: 0; min-height: 40px;
+}
+.status-msg { font-size: 13px; margin-left: 12px; color: #94a3b8; }
+.status-msg.ok  { color: #4ade80; }
+.status-msg.err { color: #f87171; }
+.tables-list {
+  font-family: ui-monospace, monospace; font-size: 12px;
+  color: #cbd5e1; background: #0f172a; padding: 10px 12px;
+  border-radius: 6px; border: 1px solid #334155;
+}
+.tables-list span {
+  display: inline-block; margin-right: 14px; margin-bottom: 4px;
+}
+#btn-execute-sql {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+#btn-execute-sql:hover {
+  background: #2563eb;
+}
+
+#btn-execute-sql:disabled {
+  background: #475569;
+  cursor: not-allowed;
+}
+
+#sql-result {
+  overflow-x: auto;
+}
+
+#sql-result table {
+  margin-top: 8px;
+}
+
+#sql-result td {
+  vertical-align: top;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+</style>
+
+<script>
+// ============================================================
+// ADMIN — Crear tabla
+// ============================================================
+let allowedTypes = [];
+let allowedDefaults = [];
+
+async function loadColumnTypes() {
+  try {
+    const r = await fetch('/api/admin/column-types').then(r => r.json());
+    allowedTypes = r.types;
+    allowedDefaults = r.defaults;
+  } catch (err) {
+    console.error('Error cargando tipos:', err);
+  }
+}
+
+function colRowTemplate(col = {}) {
+  const tr = document.createElement('tr');
+
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.placeholder = 'nombre';
+  nameInput.value = col.name || '';
+  nameInput.className = 'col-name';
+
+  const typeSelect = document.createElement('select');
+  typeSelect.className = 'col-type';
+  allowedTypes.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t; opt.textContent = t;
+    if (t === (col.type || 'TEXT')) opt.selected = true;
+    typeSelect.appendChild(opt);
+  });
+
+  const nullableCb = document.createElement('input');
+  nullableCb.type = 'checkbox';
+  nullableCb.className = 'col-nullable';
+  nullableCb.checked = col.nullable !== false;
+
+  const pkCb = document.createElement('input');
+  pkCb.type = 'checkbox';
+  pkCb.className = 'col-pk';
+  pkCb.checked = !!col.primary_key;
+
+  const defSelect = document.createElement('select');
+  defSelect.className = 'col-default';
+  const emptyOpt = document.createElement('option');
+  emptyOpt.value = ''; emptyOpt.textContent = '(ninguno)';
+  defSelect.appendChild(emptyOpt);
+  allowedDefaults.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d; opt.textContent = d;
+    if (d === (col.default || '')) opt.selected = true;
+    defSelect.appendChild(opt);
+  });
+
+  const delBtn = document.createElement('button');
+  delBtn.type = 'button';
+  delBtn.className = 'del';
+  delBtn.textContent = '✕';
+  delBtn.onclick = () => { tr.remove(); updatePreview(); };
+
+  tr.appendChild(wrapTd(nameInput));
+  tr.appendChild(wrapTd(typeSelect));
+  tr.appendChild(wrapTd(nullableCb));
+  tr.appendChild(wrapTd(pkCb));
+  tr.appendChild(wrapTd(defSelect));
+  tr.appendChild(wrapTd(delBtn));
+
+  [nameInput, typeSelect, nullableCb, pkCb, defSelect].forEach(el => {
+    el.addEventListener('input', updatePreview);
+    el.addEventListener('change', updatePreview);
+  });
+
+  return tr;
+}
+
+function wrapTd(el) {
+  const td = document.createElement('td');
+  td.appendChild(el);
+  return td;
+}
+
+function collectColumns() {
+  const rows = document.querySelectorAll('#cols-body tr');
+  const cols = [];
+  rows.forEach(tr => {
+    const name = tr.querySelector('.col-name').value.trim();
+    if (!name) return;
+    cols.push({
+      name,
+      type: tr.querySelector('.col-type').value,
+      nullable: tr.querySelector('.col-nullable').checked,
+      primary_key: tr.querySelector('.col-pk').checked,
+      default: tr.querySelector('.col-default').value || null,
+    });
+  });
+  return cols;
+}
+
+function updatePreview() {
+  const name = document.getElementById('tbl-name').value.trim() || 'mi_tabla';
+  const cols = collectColumns();
+  if (!cols.length) {
+    document.getElementById('ddl-preview').textContent = '(agrega al menos una columna)';
+    return;
+  }
+  const lines = cols.map(c => {
+    const parts = [c.name, c.type];
+    if (c.primary_key) parts.push('PRIMARY KEY');
+    if (!c.nullable && !c.primary_key) parts.push('NOT NULL');
+    if (c.default) parts.push(`DEFAULT ${c.default}`);
+    return '    ' + parts.join(' ');
+  });
+  document.getElementById('ddl-preview').textContent =
+    `CREATE TABLE IF NOT EXISTS ${name} (\n${lines.join(',\n')}\n);`;
+}
+
+document.getElementById('tbl-name').addEventListener('input', updatePreview);
+
+document.getElementById('btn-add-col').addEventListener('click', () => {
+  document.getElementById('cols-body').appendChild(colRowTemplate());
+  updatePreview();
+});
+
+document.getElementById('btn-create-table').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-create-table');
+  const status = document.getElementById('create-status');
+  const tableName = document.getElementById('tbl-name').value.trim();
+  const cols = collectColumns();
+
+  if (!tableName) {
+    status.textContent = 'Falta el nombre de la tabla';
+    status.className = 'status-msg err';
+    return;
+  }
+  if (!cols.length) {
+    status.textContent = 'Agrega al menos una columna';
+    status.className = 'status-msg err';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Creando...';
+  status.textContent = '';
+  status.className = 'status-msg';
+
+  try {
+    const r = await fetch('/api/admin/create-table', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ table_name: tableName, columns: cols, if_not_exists: true }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+    status.textContent = `✅ Tabla '${data.table}' creada`;
+    status.className = 'status-msg ok';
+    loadTables();
+  } catch (err) {
+    status.textContent = '❌ ' + err.message;
+    status.className = 'status-msg err';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✓ Crear tabla';
+  }
+});
+
+async function loadTables() {
+  try {
+    const r = await fetch('/api/admin/tables').then(r => r.json());
+    const el = document.getElementById('tables-list');
+    el.innerHTML = r.tables.length
+      ? r.tables.map(t => `<span>📋 ${t}</span>`).join('')
+      : 'Sin tablas.';
+  } catch (err) {
+    document.getElementById('tables-list').textContent = 'Error: ' + err.message;
+  }
+}
+
+// Bootstrap del panel
+(async () => {
+  await loadColumnTypes();
+
+  // Pre-cargar 3 columnas típicas (id, nombre, ts)
+  document.getElementById('cols-body').appendChild(colRowTemplate({
+    name: 'id', type: 'BIGSERIAL', primary_key: true, nullable: false,
+  }));
+  document.getElementById('cols-body').appendChild(colRowTemplate({
+    name: 'nombre', type: 'TEXT', nullable: true,
+  }));
+  document.getElementById('cols-body').appendChild(colRowTemplate({
+    name: 'ts', type: 'TIMESTAMPTZ', nullable: false, default: 'NOW()',
+  }));
+
+  updatePreview();
+  loadTables();
+})();
+</script>
+</body>
+<style>
+.admin-panel {
+  margin-top: 24px; padding: 16px;
+  background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+}
+.admin-panel h3 { margin: 0 0 12px; font-size: 14px; color: #cbd5e1; }
+#admin-status { font-size: 13px; color: #94a3b8; margin-bottom: 12px; line-height: 1.6; }
+#btn-apply-migrations {
+  background: #3b82f6; color: white; border: none;
+  padding: 8px 16px; border-radius: 6px; cursor: pointer;
+  font-size: 13px; font-weight: 500;
+}
+#btn-apply-migrations:hover { background: #2563eb; }
+#btn-apply-migrations:disabled { background: #475569; cursor: not-allowed; }
+.mig-ok { color: #4ade80; }
+.mig-missing { color: #f87171; }
+.mig-list { font-family: ui-monospace, monospace; font-size: 12px; }
+</style>
+
+<script>
+async function checkMigrations() {
+  const status = document.getElementById('admin-status');
+  const btn = document.getElementById('btn-apply-migrations');
+  try {
+    const r = await fetch('/api/admin/migrations').then(r => r.json());
+    const applied = r.applied || [];
+    const pending = r.pending || [];
+
+    let html = '';
+    if (applied.length) {
+      html += `<div class="mig-list">`;
+      applied.forEach(name => {
+        html += `<div><span class="mig-ok">✅</span> ${name}</div>`;
+      });
+      html += `</div>`;
+    }
+    if (pending.length) {
+      html += `<div class="mig-list" style="margin-top:8px;">`;
+      pending.forEach(name => {
+        html += `<div><span class="mig-missing">❌</span> ${name} <em>(pendiente)</em></div>`;
+      });
+      html += `</div>`;
+    }
+    if (!applied.length && !pending.length) {
+      html = 'Sin migraciones registradas.';
+    }
+    status.innerHTML = html;
+
+    btn.style.display = pending.length ? 'inline-block' : 'none';
+    btn.textContent = `➕ Aplicar ${pending.length} migración${pending.length !== 1 ? 'es' : ''} pendiente${pending.length !== 1 ? 's' : ''}`;
+  } catch (err) {
+    status.textContent = 'Error: ' + err.message;
+  }
+}
+
+
+checkMigrations();
+</script>
+<style>
+.admin-panel {
+  margin-top: 24px;
+  padding: 16px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+}
+.admin-panel h3 { margin: 0 0 12px; font-size: 14px; color: #cbd5e1; }
+#admin-status { font-size: 13px; color: #94a3b8; margin-bottom: 12px; }
+#btn-init-tables {
+  background: #3b82f6; color: white; border: none;
+  padding: 8px 16px; border-radius: 6px; cursor: pointer;
+  font-size: 13px; font-weight: 500;
+}
+#btn-init-tables:hover { background: #2563eb; }
+#btn-init-tables:disabled { background: #475569; cursor: not-allowed; }
+.table-ok { color: #4ade80; }
+.table-missing { color: #f87171; }
+</style>
+
+<script>
+async function checkTables() {
+  const status = document.getElementById('admin-status');
+  const btn = document.getElementById('btn-init-tables');
+  try {
+    const r = await fetch('/api/admin/tables').then(r => r.json());
+    if (r.job_events) {
+      status.innerHTML = `
+        <span class="table-ok">✅</span> <code>job_events</code> existe
+      `;
+      btn.style.display = 'none';
+    } else {
+      status.innerHTML = `
+        <span class="table-missing">❌</span> <code>job_events</code> no existe
+      `;
+      btn.style.display = 'inline-block';
+    }
+  } catch (err) {
+    status.textContent = 'Error verificando tablas: ' + err.message;
+  }
+}
+
+
+// Chequear al cargar
+checkTables();
+</script>
+
+<script>
+const REFRESH_MS = 10000;
+let currentStatus = '';
+let currentSearch = '';
+let selectedId = null;
+let allJobs = [];
+
+// ---------- Helpers ----------
+function fmtDuration(sec) {
+  if (sec == null) return '—';
+  if (sec < 60) return `${sec.toFixed(0)}s`;
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m}m ${s}s`;
+}
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  // Backend devuelve naive UTC → agregamos Z
+  const d = new Date(iso + (iso.endsWith('Z') ? '' : 'Z'));
+  return d.toLocaleString([], {
+    month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
+}
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+function jobLabel(j) {
+  return j.title || j.original_filename || j.url || `Job ${j.id}`;
+}
+
+// ---------- Render KPIs ----------
+function renderKpis(stats) {
+  const bs = stats.by_status || {};
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi"><div class="label">Total</div><div class="value">${stats.total}</div></div>
+    <div class="kpi"><div class="label">Pending</div><div class="value pending">${bs.pending || 0}</div></div>
+    <div class="kpi"><div class="label">Processing</div><div class="value processing">${bs.processing || 0}</div></div>
+    <div class="kpi"><div class="label">Completed</div><div class="value completed">${bs.completed || 0}</div></div>
+    <div class="kpi"><div class="label">Error</div><div class="value error">${bs.error || 0}</div></div>
+  `;
+}
+
+// ---------- Render tabla ----------
+function renderJobs() {
+  const tbody = document.getElementById('jobs');
+  let jobs = allJobs;
+
+  if (currentSearch) {
+    const q = currentSearch.toLowerCase();
+    jobs = jobs.filter(j =>
+      String(j.id).includes(q) ||
+      (jobLabel(j) || '').toLowerCase().includes(q)
+    );
+  }
+
+  if (!jobs.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Sin jobs</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = jobs.map(j => `
+    <tr data-id="${j.id}" class="${j.id === selectedId ? 'selected' : ''}">
+      <td>#${j.id}</td>
+      <td>${esc(jobLabel(j))}</td>
+      <td><span class="badge ${j.status}">${j.status}</span></td>
+      <td style="color:#94a3b8; white-space:nowrap;">${fmtDateTime(j.started_at)}</td>
+      <td style="color:#94a3b8; white-space:nowrap;">${fmtDuration(j.duration_seconds)}</td>
+    </tr>
+  `).join('');
+
+  tbody.querySelectorAll('tr[data-id]').forEach(tr => {
+    tr.addEventListener('click', () => selectJob(parseInt(tr.dataset.id)));
+  });
+}
+// ---------- Render legible de los cortes de versos hechos por el usuario ----------
+// Formatea segundos como m:ss.cc (ej. 83.4 -> 1:23.40)
+function fmtCutTime(sec) {
+  if (sec == null || isNaN(sec)) return '—';
+  const m = Math.floor(sec / 60);
+  const s = sec - m * 60;
+  return `${m}:${s.toFixed(2).padStart(5, '0')}`;
+}
+
+// parts[i] corresponde al tramo i: [0, cuts[0]], [cuts[0], cuts[1]], ...,
+// [cuts[n-1], fin]. Por eso hay (cortes + 1) tramos.
+function renderUserVerses(obj) {
+  if (!obj) {
+    return '<div class="detail-empty" style="padding:16px 0;">Sin estructura guardada</div>';
+  }
+
+  // Castear por si viene como string
+  if (typeof obj === 'string') {
+    try { obj = JSON.parse(obj); } catch { return `<div class="field-value">${esc(obj)}</div>`; }
+  }
+
+  const versos = Array.isArray(obj.versos) ? obj.versos : null;
+  const parts  = Array.isArray(obj.parts)  ? obj.parts  : null;
+  const cuts   = Array.isArray(obj.cuts)   ? obj.cuts.map(Number) : null;
+  const bpm    = obj.bpm;
+
+  // ---------- Metadata ----------
+  const meta = [];
+  if (bpm) meta.push(`BPM ${bpm}`);
+  if (cuts) meta.push(`${cuts.length} cortes`);
+  if (parts) meta.push(`${parts.length} tramos`);
+  if (versos) meta.push(`${versos.length} versos`);
+  if (obj.fase) meta.push(`fase: ${esc(obj.fase)}`);
+
+  // ---------- Vista principal: un tramo por corte, con su rango de tiempo ----------
+  let cutsHtml = '';
+  const totalRows = Math.max(parts ? parts.length : 0, cuts ? cuts.length + 1 : 0);
+
+  if (totalRows > 0) {
+    const rows = [];
+    for (let i = 0; i < totalRows; i++) {
+      const p = parts && parts[i] ? parts[i] : {};
+      const t0 = i === 0 ? 0 : (cuts ? cuts[i - 1] : null);
+      const t1 = cuts && i < cuts.length ? cuts[i] : null;   // null = hasta el final
+      const dur = (t0 != null && t1 != null) ? (t1 - t0) : null;
+
+      const label = p.label ? `<span class="part-label">${esc(p.label)}</span>` : '';
+      const lyrics = p.lyrics && p.lyrics.trim()
+        ? esc(p.lyrics).replace(/_([^_\s]+)/g, '<u>$1</u>')
+        : '<em style="color:#64748b;">(sin letra)</em>';
+
+      rows.push(`
+        <div class="cut-row">
+          <span class="cut-num">${String(i + 1).padStart(2, '0')}</span>
+          <div class="cut-body">
+            <div class="cut-times">
+              <span class="cut-time">${fmtCutTime(t0)}</span>
+              <span class="cut-arrow">→</span>
+              <span class="cut-time">${t1 != null ? fmtCutTime(t1) : 'fin'}</span>
+              ${dur != null ? `<span class="cut-dur">${dur.toFixed(2)} s</span>` : ''}
+              ${label}
+            </div>
+            <div class="part-lyrics">${lyrics}</div>
+          </div>
+        </div>
+      `);
+    }
+    cutsHtml = `<div class="cut-list">${rows.join('')}</div>`;
+  } else {
+    cutsHtml = '<div style="color:#94a3b8;font-size:12px;">No hay cortes guardados.</div>';
+  }
+
+  // ---------- Versos originales (texto corregido en el paso 1), colapsable ----------
+  let versosHtml = '';
+  if (versos && versos.length) {
+    const items = versos.map((v, i) => `
+      <div class="user-verse">
+        <span class="user-verse-num">${String(i + 1).padStart(2, '0')}</span>
+        <span class="user-verse-text">${esc(v)}</span>
+      </div>
+    `).join('');
+    versosHtml = `
+      <details class="user-parts-details">
+        <summary>Ver versos del paso 1 sin cortar (${versos.length})</summary>
+        <div class="user-verses" style="margin-top:10px;">${items}</div>
+      </details>
+    `;
+  }
+
+  return `
+    <div class="user-meta">${meta.join(' · ')}</div>
+    ${cutsHtml}
+    ${versosHtml}
+  `;
+}
+// ---------- Render detalle ----------
+async function selectJob(id) {
+  selectedId = id;
+  renderJobs();  // actualiza highlight
+  const detail = document.getElementById('detail');
+  detail.innerHTML = '<div class="detail-empty">Cargando...</div>';
+
+  try {
+    const j = await fetch(`/api/jobs/${id}/detail`).then(r => r.json());
+
+    const canRequeue = j.status === 'completed' || j.status === 'error';
+    const resultStr = j.result
+      ? JSON.stringify(j.result, null, 2)
+      : '(sin result)';
+
+    // Normaliza structure_user a objeto una sola vez: puede venir como
+    // string (columna TEXT con JSON serializado) o ya como objeto (JSONB).
+    let structureUserObj = null;
+    if (j.structure_user) {
+      if (typeof j.structure_user === 'string') {
+        try { structureUserObj = JSON.parse(j.structure_user); }
+        catch { structureUserObj = null; }
+      } else {
+        structureUserObj = j.structure_user;
+      }
+    }
+    const structureUserStr = structureUserObj
+      ? JSON.stringify(structureUserObj, null, 2)
+      : (j.structure_user || '(sin estructura de usuario guardada)');
+
+    // Payload EXACTO que recibe el backend de LaTeX: el texto SongPro
+    // (acordes + guiones bajos) que Flutter arma con
+    // _generarTextoCancionero() y guarda tal cual en
+    // structure_user.chords_text (PUT /jobs/{id}/structure). No se
+    // recalcula nada acá: es literal lo que quedó guardado.
+    const chordsText = structureUserObj?.chords_text ?? null;
+    const latexPayloadStr = chordsText
+      ? JSON.stringify({ job_id: j.id, chords_text: chordsText }, null, 2)
+      : '(este job aún no tiene chords_text guardado — falta guardar la estructura desde la app)';
+
+    detail.innerHTML = `
+      <h2>#${j.id} · ${esc(jobLabel(j))}</h2>
+      <div class="meta">
+        <span class="badge ${j.status}">${j.status}</span>
+        ${j.url ? `· <span title="${esc(j.url)}">${esc(j.url.slice(0, 50))}${j.url.length > 50 ? '…' : ''}</span>` : ''}
+      </div>
+
+      <div class="actions">
+        <button class="btn-requeue" id="btn-requeue"
+                ${canRequeue ? '' : 'disabled title="Solo para completed o error"'}>
+          🔄 Reencolar
+        </button>
+        <button class="btn-copy" id="btn-copy">📋 Copiar JSON</button>
+        <button class="btn-copy" id="btn-copy-user">📋 Copiar JSON (usuario)</button>
+        <button class="btn-copy" id="btn-copy-latex">📋 Copiar JSON (LaTeX final)</button>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Creado</div>
+        <div class="field-value">${fmtDateTime(j.created_at)}</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Iniciado</div>
+        <div class="field-value">${fmtDateTime(j.started_at)}</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Terminado</div>
+        <div class="field-value">${fmtDateTime(j.finished_at)}</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Duración</div>
+        <div class="field-value">${fmtDuration(j.duration_seconds)}</div>
+      </div>
+
+      ${j.error ? `
+      <div class="field">
+        <div class="field-label">Error</div>
+        <div class="field-value error-text">${esc(j.error)}</div>
+      </div>` : ''}
+
+      ${j.lyrics ? `
+      <div class="field">
+        <div class="field-label">Letra</div>
+        <div class="field-value mono">${esc(j.lyrics)}</div>
+      </div>` : ''}
+
+      <div class="field">
+        <div class="field-label">Result (JSON)</div>
+        <div class="field-value mono" id="result-json">${esc(resultStr)}</div>
+      </div>
+
+ <div class="field">
+  <div class="field-label">✂️ Versos cortados por el usuario</div>
+  <div id="structure-user-view">${renderUserVerses(structureUserObj)}</div>
+</div>
+
+<div class="field">
+  <div class="field-label">Structure User (JSON crudo)</div>
+  <div class="field-value mono" id="structure-user-json">${esc(structureUserStr)}</div>
+</div>
+
+      <div class="field">
+        <div class="field-label">Texto final para LaTeX (chords_text) — payload exacto que recibe /get/pdf/</div>
+        <div class="field-value mono" id="latex-final-json">${esc(latexPayloadStr)}</div>
+      </div>
+
+      <div class="events-section">
+        <h3>Eventos del pipeline</h3>
+    <div class="events-status" id="events-status"></div>
+        <div class="events-timeline" id="events-timeline">
+          <div class="empty">Cargando eventos...</div>
+        </div>
+      </div>
+    `;
+
+
+
+    const requeueBtn = document.getElementById('btn-requeue');
+    if (requeueBtn && !requeueBtn.disabled) {
+      requeueBtn.addEventListener('click', () => requeueJob(j.id));
+    }
+
+        document.getElementById('btn-copy').addEventListener('click', () => {
+      navigator.clipboard.writeText(resultStr);
+      const btn = document.getElementById('btn-copy');
+      btn.textContent = '✅ Copiado';
+      setTimeout(() => btn.textContent = '📋 Copiar JSON', 1500);
+    });
+
+    // Copia la estructura GUARDADA POR EL USUARIO (cortes, letra corregida,
+    // chordPlacement y chords_text) — NO la salida cruda del worker que
+    // copia el botón de arriba. Ya viene normalizada en structureUserStr.
+    document.getElementById('btn-copy-user').addEventListener('click', () => {
+      const btn = document.getElementById('btn-copy-user');
+      navigator.clipboard.writeText(structureUserStr);
+      btn.textContent = '✅ Copiado';
+      setTimeout(() => btn.textContent = '📋 Copiar JSON (usuario)', 1500);
+    });
+
+    // Copia SOLO el payload que le importa al backend de LaTeX: el texto
+    // SongPro (acordes + guiones bajos) tal cual va a llegar a /get/pdf/,
+    // envuelto en JSON para poder inspeccionarlo/pegarlo sin ambigüedad.
+    document.getElementById('btn-copy-latex').addEventListener('click', () => {
+      const btn = document.getElementById('btn-copy-latex');
+      navigator.clipboard.writeText(latexPayloadStr);
+      btn.textContent = '✅ Copiado';
+      setTimeout(() => btn.textContent = '📋 Copiar JSON (LaTeX final)', 1500);
+    });
+
+    // Cargar eventos del pipeline
+    startEventsPolling(j.id, j.status);
+  } catch (err) {
+    detail.innerHTML = `<div class="detail-empty">Error: ${esc(err.message)}</div>`;
+  }
+}
+
+
+async function executeSQL() {
+  const sqlEl = document.getElementById('sql-query');
+  const result = document.getElementById('sql-result');
+  const status = document.getElementById('sql-status');
+  const btn = document.getElementById('btn-execute-sql');
+
+  const sql = sqlEl.value.trim();
+
+  if (!sql) {
+    status.textContent = 'Escribe una consulta.';
+    status.className = 'status-msg err';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Ejecutando...';
+
+  status.textContent = '';
+  status.className = 'status-msg';
+
+  result.innerHTML = '';
+
+  try {
+    const res = await fetch('/api/admin/sql', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ sql: sql })
+    });
+
+    const data = await res.json();
+
+    console.log('SQL RESPONSE:', data);
+
+    if (!res.ok) {
+      throw new Error(data.detail || `HTTP ${res.status}`);
+    }
+
+    // ============================================================
+    // UPDATE
+    // ============================================================
+
+    if (data.type === 'update') {
+
+      status.textContent =
+        `✅ UPDATE ejecutado — ${data.count} fila${data.count === 1 ? '' : 's'} modificada${data.count === 1 ? '' : 's'}`;
+
+      status.className = 'status-msg ok';
+
+      result.innerHTML = `
+        <div style="
+          margin-top: 8px;
+          padding: 12px;
+          background: #0f172a;
+          border: 1px solid #334155;
+          border-radius: 6px;
+          color: #e2e8f0;
+          font-family: ui-monospace, monospace;
+          font-size: 13px;
+        ">
+          UPDATE ejecutado correctamente.<br>
+          Filas modificadas: <strong>${data.count}</strong>
+        </div>
+      `;
+
+      return;
+    }
+
+    // ============================================================
+    // SELECT
+    // ============================================================
+
+    if (!data.rows || data.rows.length === 0) {
+
+      status.textContent =
+        '✅ Consulta ejecutada — sin resultados';
+
+      status.className = 'status-msg ok';
+
+      result.innerHTML =
+        '<div class="empty">Sin resultados.</div>';
+
+      return;
+    }
+
+    const columns = Object.keys(data.rows[0]);
+
+    let html = `
+      <div style="
+        margin-bottom:8px;
+        color:#94a3b8;
+        font-size:12px;
+      ">
+        ${data.count} fila${data.count === 1 ? '' : 's'}
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            ${columns
+              .map(c => `<th>${esc(c)}</th>`)
+              .join('')}
+          </tr>
+        </thead>
+
+        <tbody>
+    `;
+
+    for (const row of data.rows) {
+
+      html += '<tr>';
+
+      for (const column of columns) {
+
+        let value = row[column];
+
+        if (value === null || value === undefined) {
+          value = '';
+        } else if (typeof value === 'object') {
+          value = JSON.stringify(value, null, 2);
+        }
+
+        html += `<td>${esc(String(value))}</td>`;
+      }
+
+      html += '</tr>';
+    }
+
+    html += `
+        </tbody>
+      </table>
+    `;
+
+    result.innerHTML = html;
+
+    status.textContent =
+      '✅ Consulta ejecutada';
+
+    status.className =
+      'status-msg ok';
+
+  } catch (err) {
+
+    console.error('SQL ERROR:', err);
+
+    status.textContent =
+      '❌ ' + err.message;
+
+    status.className =
+      'status-msg err';
+
+  } finally {
+
+    btn.disabled = false;
+    btn.textContent =
+      '▶ Ejecutar consulta';
+  }
+}
+document.getElementById('btn-execute-sql').addEventListener('click', executeSQL);
+// ---------- Reencolar ----------
+async function requeueJob(id) {
+  if (!confirm(`¿Reencolar el job #${id}?\n\nSe pondrá en 'pending' y el worker lo procesará de nuevo.`)) return;
+
+  const btn = document.getElementById('btn-requeue');
+  btn.disabled = true;
+  btn.textContent = '⏳ Reencolando...';
+
+  try {
+    const res = await fetch(`/api/jobs/${id}/requeue`, { method: 'POST' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    btn.textContent = '✅ Reencolado';
+    setTimeout(() => load(), 800);
+  } catch (err) {
+    alert('Error al reencolar: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = '🔄 Reencolar';
+  }
+}
+
+// ---------- Carga ----------
+async function load() {
+  try {
+    const params = new URLSearchParams();
+    if (currentStatus) params.set('status', currentStatus);
+    params.set('limit', '200');
+
+    const [stats, list] = await Promise.all([
+      fetch('/api/stats').then(r => r.json()),
+      fetch('/api/jobs/list?' + params).then(r => r.json()),
+    ]);
+
+    renderKpis(stats);
+    allJobs = list.items;
+    renderJobs();
+
+    document.getElementById('updated').textContent =
+      'Actualizado ' + new Date().toLocaleTimeString();
+
+  } catch (err) {
+    document.getElementById('updated').textContent = '⚠ Error: ' + err.message;
+    console.error(err);
+  }
+}
+
+// ---------- Eventos ----------
+document.querySelectorAll('.controls button[data-status]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.controls button[data-status]')
+      .forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentStatus = btn.dataset.status;
+    load();
+  });
+});
+
+document.getElementById('search').addEventListener('input', (e) => {
+  currentSearch = e.target.value.trim();
+  renderJobs();
+});
+
+document.getElementById('refresh-btn').addEventListener('click', load);
+// ---------- Eventos del pipeline ----------
+let eventsPollTimer = null;
+let eventsLastId = 0;
+let eventsJobId = null;
+
+const STAGE_ICONS = {
+  start:      '🚀',
+  download:   '📥',
+  stems:      '🎼',
+  structure:  '🎵',
+  chords:     '🎸',
+  whisper:    '📝',
+  cuts:       '✂️',
+  done:       '✅',
+  error:      '❌',
+};
+
+function fmtEventTime(iso) {
+  if (!iso) return '';
+  // El backend ya devuelve ISO con timezone, no agregamos Z
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function renderEventData(ev) {
+  if (!ev.data) return '';
+
+  // Caso especial: acordes
+  if (ev.stage === 'chords' && ev.data.chords && Array.isArray(ev.data.chords)) {
+    const top = ev.data.chords.slice(0, 30);
+    const pills = top.map(c => {
+      const chord = typeof c === 'string' ? c : (c.chord || '?');
+      return `<span class="chord-pill">${esc(chord)}</span>`;
+    }).join('');
+    const more = ev.data.chords.length > top.length
+      ? `<div style="margin-top:6px;color:#64748b;font-size:11px;">... y ${ev.data.chords.length - top.length} más</div>`
+      : '';
+    return `<div class="chord-pills">${pills}</div>${more}`;
+  }
+
+  // Caso especial: transcripción
+  if (ev.stage === 'whisper' && ev.data.text) {
+    const txt = ev.data.text;
+    return `<div class="event-data">${esc(txt)}</div>`;
+  }
+
+  // Default: JSON formateado
+  return `<div class="event-data">${esc(JSON.stringify(ev.data, null, 2))}</div>`;
+}
+
+function renderEvent(ev) {
+  const icon = STAGE_ICONS[ev.stage] || '•';
+  const levelClass = ev.level && ev.level !== 'info' ? `level-${ev.level}` : '';
+  return `
+    <div class="event-row ${levelClass}" data-event-id="${ev.id}">
+      <div class="time">${fmtEventTime(ev.ts)}</div>
+      <div class="icon">${icon}</div>
+      <div class="body">
+        <div class="msg">${esc(ev.message)}</div>
+        ${renderEventData(ev)}
+      </div>
+    </div>
+  `;
+}
+
+function appendEvents(events) {
+  const timeline = document.getElementById('events-timeline');
+  if (!timeline) return;
+
+  // Si era el mensaje de "cargando", quitarlo
+  const emptyMsg = timeline.querySelector('.empty');
+  if (emptyMsg) emptyMsg.remove();
+
+  const html = events.map(renderEvent).join('');
+  timeline.insertAdjacentHTML('beforeend', html);
+}
+
+async function loadEventsOnce(jobId) {
+  try {
+    const url = `/api/jobs/${jobId}/events?after_id=${eventsLastId}&limit=200`;
+    const events = await fetch(url).then(r => r.json());
+
+    if (events.length) {
+      appendEvents(events);
+      eventsLastId = events[events.length - 1].id;
+    }
+
+    const statusEl = document.getElementById('events-status');
+    if (statusEl) {
+      const total = document.querySelectorAll('.event-row').length;
+      statusEl.textContent = `${total} evento${total !== 1 ? 's' : ''}`;
+    }
+
+    return events;
+  } catch (err) {
+    const statusEl = document.getElementById('events-status');
+    if (statusEl) statusEl.textContent = 'Error cargando eventos';
+    console.error(err);
+    return [];
+  }
+}
+
+function stopEventsPolling() {
+  if (eventsPollTimer) {
+    clearInterval(eventsPollTimer);
+    eventsPollTimer = null;
+  }
+  const statusEl = document.getElementById('events-status');
+  if (statusEl && statusEl.classList.contains('live')) {
+    statusEl.classList.remove('live');
+  }
+}
+
+async function startEventsPolling(jobId, jobStatus) {
+  // Reset estado de eventos
+  stopEventsPolling();
+  eventsLastId = 0;
+  eventsJobId = jobId;
+
+  // Cargar la primera tanda
+  await loadEventsOnce(jobId);
+
+  // Si el job está en processing o pending, seguir polleando cada 2s
+  if (jobStatus === 'processing' || jobStatus === 'pending') {
+    const statusEl = document.getElementById('events-status');
+    if (statusEl) {
+      statusEl.classList.add('live');
+      const baseText = statusEl.textContent;
+      statusEl.textContent = `${baseText} · actualizando...`;
+    }
+
+    eventsPollTimer = setInterval(async () => {
+      // Si cambió de job, parar
+      if (eventsJobId !== jobId) {
+        stopEventsPolling();
+        return;
+      }
+
+      const newEvents = await loadEventsOnce(jobId);
+
+      // Si llega un evento terminal (done/error), dejar de pollear
+      if (newEvents.some(e => e.stage === 'done' || e.stage === 'error')) {
+        stopEventsPolling();
+      }
+    }, 2000);
+  }
+}
+// ---------- Estado de workers ----------
+async function loadWorkerStatus() {
+  const panel = document.getElementById('workerStatus');
+  if (!panel) return;
+
+  try {
+    const response = await fetch('/api/workers/status', { cache: 'no-store' });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+
+    const data = await response.json();
+    const names = [
+      ['local-worker', 'Local'],
+      ['kaggle-worker', 'Kaggle']
+    ];
+
+    panel.innerHTML = names.map(([id, label]) => {
+      const worker = (data.workers || {})[id] || {};
+      const active = worker.active === true;
+      const seconds = worker.seconds_since_heartbeat;
+      const age = seconds == null
+        ? 'Sin heartbeat registrado'
+        : 'Último heartbeat: hace ' + Math.max(0, Math.floor(seconds)) + ' s';
+
+      return `
+        <div class="worker-card">
+          <span class="worker-dot ${active ? 'active' : 'inactive'}"></span>
+          <div>
+            <div class="worker-name">${label}: ${active ? 'ACTIVO' : 'INACTIVO'}</div>
+            <div class="worker-detail">${age}</div>
+          </div>
+        </div>`;
+    }).join('');
+  } catch (err) {
+    panel.innerHTML = `
+      <div class="worker-card">
+        <span class="worker-dot inactive"></span>
+        <div>
+          <div class="worker-name">Estado no disponible</div>
+          <div class="worker-detail">${String(err.message)}</div>
+        </div>
+      </div>`;
+    console.error('Error consultando workers:', err);
+  }
+}
+// ---------- Loop ----------
+load();
+loadWorkerStatus();
+setInterval(loadWorkerStatus, 10000);
+//setInterval(load, REFRESH_MS);
+</script>
+</body>
+</html>
